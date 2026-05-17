@@ -1,0 +1,135 @@
+"use client";
+
+import { useState, useCallback } from "react";
+import { AlertCircle, BookOpen, ArrowRight } from "lucide-react";
+import { SearchBar } from "@/components/dashboard/SearchBar";
+import { EventFeedTable } from "@/components/dashboard/EventFeedTable";
+import { StatsBar } from "@/components/dashboard/StatsBar";
+import { translateEvents } from "@/lib/translator/registry";
+import { getMockEventsForContract, MOCK_RAW_EVENTS } from "@/lib/mock-data";
+import type { TranslatedEvent } from "@/lib/translator/types";
+
+/** Simulates a network delay for realistic UX. */
+function simulateNetworkDelay(ms: number): Promise<void> {
+  return new Promise(function (resolve) {
+    setTimeout(resolve, ms);
+  });
+}
+
+export function DashboardClient(): React.JSX.Element {
+  const [events, setEvents] = useState<TranslatedEvent[]>(function () {
+    return translateEvents(MOCK_RAW_EVENTS);
+  });
+  const [isLoading, setIsLoading] = useState(false);
+  const [searchedContract, setSearchedContract] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSearch = useCallback(async function (contractId: string): Promise<void> {
+    if (!contractId) {
+      setEvents(translateEvents(MOCK_RAW_EVENTS));
+      setSearchedContract(null);
+      setError(null);
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      // Simulate fetching from Stellar network
+      await simulateNetworkDelay(800);
+
+      const rawEvents = getMockEventsForContract(contractId);
+      const translated = translateEvents(rawEvents);
+      setEvents(translated);
+      setSearchedContract(contractId);
+    } catch {
+      setError("Failed to fetch events. Please check the Contract ID and try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  return (
+    <div className="space-y-6">
+      {/* Search */}
+      <section aria-label="Contract search">
+        <SearchBar onSearch={handleSearch} isLoading={isLoading} />
+      </section>
+
+      {/* Error state */}
+      {error && (
+        <div
+          role="alert"
+          className="flex items-start gap-3 rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive"
+        >
+          <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+          <p>{error}</p>
+        </div>
+      )}
+
+      {/* Active filter indicator */}
+      {searchedContract && !isLoading && (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <span>Showing events for:</span>
+          <code className="font-mono text-xs bg-muted px-2 py-1 rounded">
+            {searchedContract.slice(0, 10)}...{searchedContract.slice(-6)}
+          </code>
+          <button
+            type="button"
+            onClick={function () {
+              handleSearch("");
+            }}
+            className="text-violet-600 dark:text-violet-400 hover:underline text-xs"
+          >
+            Clear filter
+          </button>
+        </div>
+      )}
+
+      {/* Stats */}
+      {!isLoading && <StatsBar events={events} />}
+
+      {/* Feed */}
+      <section aria-label="Event feed">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
+            Event Feed
+          </h2>
+          <span className="text-xs text-muted-foreground">
+            {isLoading ? "Loading..." : `${events.length} events`}
+          </span>
+        </div>
+        <EventFeedTable events={events} isLoading={isLoading} />
+      </section>
+
+      {/* Contributor CTA */}
+      <section
+        aria-label="Contribute"
+        className="rounded-lg border border-violet-200 dark:border-violet-800 bg-violet-50 dark:bg-violet-950/30 p-5"
+      >
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <BookOpen className="h-5 w-5 text-violet-600 dark:text-violet-400 mt-0.5 flex-shrink-0" />
+            <div>
+              <p className="text-sm font-medium">Help translate more contracts</p>
+              <p className="text-sm text-muted-foreground mt-0.5">
+                Open-Audit is community-powered. Add a translation blueprint and earn
+                Stellar Drips rewards.
+              </p>
+            </div>
+          </div>
+          <a
+            href="https://github.com/your-org/open-audit/blob/main/CONTRIBUTING.md"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 text-sm font-medium text-violet-700 dark:text-violet-400 hover:underline whitespace-nowrap"
+          >
+            Read the guide
+            <ArrowRight className="h-4 w-4" />
+          </a>
+        </div>
+      </section>
+    </div>
+  );
+}

@@ -1,0 +1,135 @@
+/**
+ * The Open-Audit Translation Registry
+ *
+ * This is the central lookup table that maps Contract IDs to their
+ * translation blueprints. When a raw event arrives, the registry:
+ *
+ *   1. Looks up the contract ID in the blueprint map.
+ *   2. Calls the blueprint's translate() function.
+ *   3. Returns a TranslatedEvent with a human-readable description,
+ *      or marks the event as "cryptic" if no blueprint matches.
+ *
+ * To add support for a new contract, create a blueprint in ./blueprints/
+ * and register it in buildRegistry() below.
+ */
+
+import { createAllSacBlueprints } from "./blueprints/sac-transfer";
+import { createSacMintBurnBlueprint } from "./blueprints/sac-mint-burn";
+import type { RawEvent, TranslatedEvent, TranslationBlueprint } from "./types";
+
+/** The registry maps contract IDs to their blueprints. */
+type BlueprintRegistry = Map<string, TranslationBlueprint>;
+
+/**
+ * Builds the global blueprint registry by collecting all known blueprints.
+ * Add new blueprints here as the community contributes them.
+ */
+function buildRegistry(): BlueprintRegistry {
+  const registry: BlueprintRegistry = new Map();
+
+  const allBlueprints: TranslationBlueprint[] = [
+    // Stellar Asset Contract — Transfer events
+    ...createAllSacBlueprints(),
+
+    // Stellar Asset Contract — Mint/Burn events
+    createSacMintBurnBlueprint("CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC"),
+    createSacMintBurnBlueprint("CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA"),
+    createSacMintBurnBlueprint("CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM"),
+    createSacMintBurnBlueprint("CBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"),
+
+    // TODO: Add Soroswap Router blueprint (see good-first-issues.json GFI-003)
+    // TODO: Add Blend Protocol blueprint
+    // TODO: Add Phoenix DEX blueprint
+  ];
+
+  for (const blueprint of allBlueprints) {
+    registry.set(blueprint.contractId, blueprint);
+  }
+
+  return registry;
+}
+
+/** Singleton registry instance. */
+const REGISTRY: BlueprintRegistry = buildRegistry();
+
+/**
+ * Translates a single raw Soroban event into a human-readable TranslatedEvent.
+ *
+ * Looks up the contract ID in the registry, finds the matching blueprint,
+ * and calls its translate() function. If no blueprint is found or the
+ * blueprint returns null, the event is marked as "cryptic".
+ */
+export function translateEvent(event: RawEvent): TranslatedEvent {
+  const blueprint = REGISTRY.get(event.contractId);
+
+  if (!blueprint) {
+    return {
+      raw: event,
+      description: null,
+      status: "cryptic",
+      blueprintName: null,
+      eventType: null,
+    };
+  }
+
+  const result = blueprint.translate(event);
+
+  if (!result) {
+    return {
+      raw: event,
+      description: null,
+      status: "cryptic",
+      blueprintName: blueprint.contractName,
+      eventType: null,
+    };
+  }
+
+  return {
+    raw: event,
+    description: result.description,
+    status: "translated",
+    blueprintName: blueprint.contractName,
+    eventType: result.eventType,
+  };
+}
+
+/**
+ * Translates a batch of raw events.
+ * Preserves order and handles errors per-event gracefully.
+ */
+export function translateEvents(events: RawEvent[]): TranslatedEvent[] {
+  return events.map(function (event: RawEvent): TranslatedEvent {
+    try {
+      return translateEvent(event);
+    } catch {
+      return {
+        raw: event,
+        description: null,
+        status: "cryptic",
+        blueprintName: null,
+        eventType: null,
+      };
+    }
+  });
+}
+
+/**
+ * Returns true if a contract ID has a registered blueprint.
+ */
+export function hasBlueprint(contractId: string): boolean {
+  return REGISTRY.has(contractId);
+}
+
+/**
+ * Returns the list of all registered contract IDs.
+ */
+export function getRegisteredContracts(): string[] {
+  return Array.from(REGISTRY.keys());
+}
+
+/**
+ * Returns the number of registered blueprints.
+ */
+export function getBlueprintCount(): number {
+  return REGISTRY.size;
+}
