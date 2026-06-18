@@ -42,6 +42,7 @@ export function DashboardClient(): React.JSX.Element {
   const [searchedContract, setSearchedContract] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
+  const [events, setEvents] = useState<TranslatedEvent[]>([]);
 
   // Load previously uploaded ABIs from localStorage after mount. Doing this in
   // an effect (rather than during render) keeps the server and client output
