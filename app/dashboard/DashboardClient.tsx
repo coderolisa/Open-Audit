@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useCallback, useEffect, useMemo } from "react";
-import { AlertCircle, BookOpen, ArrowRight, Radio, PauseCircle, PlayCircle, Download, Upload, FileJson, Trash2 } from "lucide-react";
 import { SearchBar } from "@/components/dashboard/SearchBar";
 import { EventFeedTable } from "@/components/dashboard/EventFeedTable";
 import { StatsBar } from "@/components/dashboard/StatsBar";
@@ -33,8 +32,6 @@ export function DashboardClient(): React.JSX.Element {
   const [searchedContract, setSearchedContract] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
-  const [isExportOpen, setIsExportOpen] = useState(false);
-  const [liveEvents, setLiveEvents] = useState<TranslatedEvent[]>([]);
 
   // Load previously uploaded ABIs from localStorage after mount. Doing this in
   // an effect (rather than during render) keeps the server and client output
@@ -51,8 +48,6 @@ export function DashboardClient(): React.JSX.Element {
     [customAbis]
   );
 
-  // Combine live-streamed events (prepended) with the static translated feed.
-  const events = useMemo(
     function () {
       const translated = translateEvents(rawEvents, customBlueprints);
       return [...liveEvents, ...translated];
@@ -61,7 +56,7 @@ export function DashboardClient(): React.JSX.Element {
   );
 
   const handleNewEvent = useCallback((event: TranslatedEvent) => {
-    setLiveEvents((prev) => [event, ...prev]);
+
   }, []);
 
   const { isLive, isPaused, newEventIds, toggleLive, togglePause } = useLiveFeed(handleNewEvent);
@@ -98,6 +93,11 @@ export function DashboardClient(): React.JSX.Element {
   const handleAbiRemove = useCallback(function (contractId: string): void {
     setCustomAbis(removeCustomAbi(contractId));
   }, []);
+
+  // Combine initial translated events and live events
+  const allEvents = useMemo(() => {
+    return [...events, ...translatedEvents];
+  }, [events, translatedEvents]);
 
   return (
     <div className="space-y-6">
@@ -174,7 +174,7 @@ export function DashboardClient(): React.JSX.Element {
       </section>
 
       {/* Stats */}
-      {!isLoading && <StatsBar events={events} />}
+      <StatsBar events={events} isLoading={isLoading} />
 
       {/* Feed */}
       <section aria-label="Event feed">
@@ -229,11 +229,11 @@ export function DashboardClient(): React.JSX.Element {
               {isLive ? "Stop Live" : "Live Feed"}
             </Button>
             <span className="text-xs text-muted-foreground">
-              {isLoading ? "Loading..." : `${events.length} events`}
+              {isLoading ? "Loading..." : `${allEvents.length} events`}
             </span>
           </div>
         </div>
-        <EventFeedTable events={events} isLoading={isLoading} newEventIds={newEventIds} />
+        <EventFeedTable events={allEvents} isLoading={isLoading} newEventIds={newEventIds} />
       </section>
 
       {/* Contributor CTA */}

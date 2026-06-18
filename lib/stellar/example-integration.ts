@@ -26,11 +26,7 @@ function convertToRawEvent(
   return {
     id: event.id,
     contractId,
-    topics: event.topic.map((t) => t.toXDR("hex")), // Convert ScVal topics to hex strings
-    data: event.value.toXDR("hex"), // XDR-encoded data as hex string
-    ledger: event.ledger,
-    timestamp: Math.floor(Date.now() / 1000), // Unix seconds; replace with actual ledger close time in production
-    txHash: event.txHash,
+
   };
 }
 
@@ -65,7 +61,7 @@ class EventStore {
    */
   getAllEvents(): TranslatedEvent[] {
     const allEvents: TranslatedEvent[] = [];
-    Array.from(this.events.values()).forEach(function (events) {
+
       allEvents.push(...events);
     });
     // Sort by timestamp descending
