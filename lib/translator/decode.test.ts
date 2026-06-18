@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { translateEvent } from "./registry";
+import { interpolateTemplate } from "./decode";
 import type { RawEvent } from "./types";
 
 /**
@@ -51,6 +52,34 @@ const MOCK_SAC_BURN_EVENT: RawEvent = {
   timestamp: Math.floor(Date.now() / 1000) - 600,
   txHash: "f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1",
 };
+
+describe("interpolateTemplate", () => {
+  it("replaces all known placeholders", () => {
+    const result = interpolateTemplate("User {from} sent {amount} tokens to {to}.", {
+      from: "GABC...1234",
+      amount: "100.00",
+      to: "GXYZ...5678",
+    });
+    expect(result).toBe("User GABC...1234 sent 100.00 tokens to GXYZ...5678.");
+  });
+
+  it("leaves unknown placeholders intact", () => {
+    const result = interpolateTemplate("Hello {name}, your balance is {amount}.", {
+      amount: "50.00",
+    });
+    expect(result).toBe("Hello {name}, your balance is 50.00.");
+  });
+
+  it("returns the template unchanged when params is empty", () => {
+    const template = "No {vars} here {really}.";
+    expect(interpolateTemplate(template, {})).toBe(template);
+  });
+
+  it("replaces the same placeholder multiple times", () => {
+    const result = interpolateTemplate("{a} and {a}", { a: "X" });
+    expect(result).toBe("X and X");
+  });
+});
 
 describe("translateEvent", () => {
   it("translates a SAC transfer event to plain English", () => {
