@@ -6,6 +6,9 @@
  * TranslationBlueprint — the contract-specific translation logic.
  */
 
+/** Supported languages. */
+export type Language = "en" | "es" | "fr" | "zh";
+
 /** A raw Soroban contract event as fetched from Horizon/RPC. */
 export interface RawEvent {
   /** Unique event identifier (ledger sequence + index). */
@@ -60,7 +63,7 @@ export interface TranslationBlueprint {
    * Attempts to translate a raw event into a human-readable string.
    * Returns null if this blueprint cannot handle the given event.
    */
-  translate: (event: RawEvent) => TranslationResult | null;
+  translate: (event: RawEvent, lang: Language) => TranslationResult | null;
 }
 
 /** The result returned by a blueprint's translate function. */

@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import { AlertCircle, BookOpen, ArrowRight, Radio, PauseCircle, PlayCircle } from "lucide-react";
+import { useState, useCallback, useEffect, useMemo } from "react";
+import { AlertCircle, BookOpen, ArrowRight, Radio, PauseCircle, PlayCircle, Upload, FileJson, Trash2 } from "lucide-react";
 import { SearchBar } from "@/components/dashboard/SearchBar";
 import { EventFeedTable } from "@/components/dashboard/EventFeedTable";
 import { StatsBar } from "@/components/dashboard/StatsBar";
@@ -16,8 +16,8 @@ import {
 } from "@/lib/translator/custom-abi";
 import { getMockEventsForContract, MOCK_RAW_EVENTS } from "@/lib/mock-data";
 import { useLiveFeed } from "@/lib/hooks/useLiveFeed";
-import { Button } from "@/components/ui/button";
-import type { TranslatedEvent } from "@/lib/translator/types";
+import { useLanguage } from "@/lib/hooks/useLanguage";
+import type { TranslatedEvent, RawEvent, CustomAbi } from "@/lib/translator/types";
 
 /** Simulates a network delay for realistic UX. */
 function simulateNetworkDelay(ms: number): Promise<void> {
@@ -33,6 +33,7 @@ export function DashboardClient(): React.JSX.Element {
   const [searchedContract, setSearchedContract] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
+  const { language } = useLanguage();
 
   // Load previously uploaded ABIs from localStorage after mount. Doing this in
   // an effect (rather than during render) keeps the server and client output
@@ -53,9 +54,9 @@ export function DashboardClient(): React.JSX.Element {
   // feed re-translates instantly when an ABI is uploaded or removed.
   const events = useMemo(
     function () {
-      return translateEvents(rawEvents, customBlueprints);
+      return translateEvents(rawEvents, customBlueprints, language);
     },
-    [rawEvents, customBlueprints]
+    [rawEvents, customBlueprints, language]
   );
 
   const handleNewEvent = useCallback((event: TranslatedEvent) => {
