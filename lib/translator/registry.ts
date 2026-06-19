@@ -15,7 +15,7 @@
 
 import { createAllSacBlueprints } from "./blueprints/sac-transfer";
 import { createSacMintBurnBlueprint } from "./blueprints/sac-mint-burn";
-import { decodeEventName } from "./decode";
+import { decodeEventName, sanitizeTextField } from "./decode";
 import type {
   EventMatchCriteria,
   RawEvent,
@@ -106,7 +106,7 @@ export function translateEvent(
       description: null,
       status: "cryptic",
       // Surface the custom contract name (if any) so the UI still has context.
-      blueprintName: custom?.contractName ?? null,
+      blueprintName: custom?.contractName ? sanitizeTextField(custom.contractName, { maxLength: 100 }) : null,
       eventType: null,
     };
   }
@@ -118,7 +118,7 @@ export function translateEvent(
     raw: event,
     description: null,
     status: "cryptic",
-    blueprintName: blueprint.contractName,
+    blueprintName: blueprint.contractName ? sanitizeTextField(blueprint.contractName, { maxLength: 100 }) : null,
     eventType: null,
   };
 }
@@ -135,10 +135,10 @@ function applyBlueprint(event: RawEvent, blueprint: TranslationBlueprint, lang: 
 
   return {
     raw: event,
-    description: result.description,
+    description: result.description ? sanitizeTextField(result.description) : null,
     status: "translated",
-    blueprintName: blueprint.contractName,
-    eventType: result.eventType,
+    blueprintName: blueprint.contractName ? sanitizeTextField(blueprint.contractName, { maxLength: 100 }) : null,
+    eventType: result.eventType ? sanitizeTextField(result.eventType, { maxLength: 50 }) : null,
   };
 }
 
