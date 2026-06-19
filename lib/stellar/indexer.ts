@@ -13,6 +13,7 @@ import {
   setCachedEvents,
   isRedisEnabled,
 } from "../cache/redisCache";
+import { createIngestionPool, DEFAULT_WORKER_COUNT, type IngestionPoolMetrics } from "./ingestion-pool";
 import type { StellarNetworkConfig } from "./client";
 import type { RawEvent } from "../translator/types";
 
@@ -345,6 +346,49 @@ export interface StreamingIndexerOptions {
   onEvent: (event: RawEvent) => void | Promise<void>;
   /** Callback for handling errors. */
   onError?: (error: Error) => void;
+  /**
+   * Size of the parallel consumer fleet that performs the CPU-heavy work
+   * (XDR body decoding + the `onEvent` handler). Defaults to
+   * {@link DEFAULT_WORKER_COUNT}. Set to 1 for fully sequential processing.
+   */
+  workerCount?: number;
+  /**
+   * Maximum number of in-flight events before the producer applies backpressure
+   * to the stream. Omit for an unbounded buffer.
+   */
+  maxQueueSize?: number;
+}
+
+/**
+ * A lightweight envelope produced for each contract event. The producer fills
+ * in only the contract ID (cheap, needed for partition routing); the consumer
+ * performs the expensive topic/data XDR decoding when it builds the RawEvent.
+ */
+interface StreamEventEnvelope {
+  event: xdr.ContractEvent;
+  contractId: string;
+  txId: string;
+  txHash: string;
+  ledger: number;
+  eventIndex: number;
+}
+
+/** Decodes a queued envelope into Open-Audit's RawEvent shape (consumer side). */
+function envelopeToRawEvent(envelope: StreamEventEnvelope): RawEvent {
+  const { event, contractId, txId, txHash, ledger, eventIndex } = envelope;
+  return {
+    id: `${txId}-${eventIndex}`,
+    contractId,
+    topics: event
+      .body()
+      .v0()
+      .topics()
+      .map((topic) => `0x${topic.toXDR("hex")}`),
+    data: `0x${event.body().v0().data().toXDR("hex")}`,
+    ledger,
+    timestamp: Math.floor(Date.now() / 1000), // Horizon tx doesn't expose close time in the stream.
+    txHash,
+  };
 }
 
 /**
@@ -352,26 +396,58 @@ export interface StreamingIndexerOptions {
  *
  * This function establishes a persistent SSE connection to Horizon and decodes
  * Soroban events from transaction metadata in real-time.
+ *
+ * Architecture: Producer / Consumer
+ * ─────────────────────────────────
+ * The stream callback (Producer) does the minimum work needed to fan events out
+ * — extract each contract event and its contract ID — then writes them into a
+ * {@link createIngestionPool partitioned channel}. A configurable fleet of
+ * consumers drains the channel in parallel, performing the heavy XDR body
+ * decoding and invoking `onEvent` (translation / persistence / broadcast).
+ *
+ * Because events are partitioned by contract ID, all events from one contract
+ * are processed in arrival order by a single consumer (strict per-contract
+ * ordering), while events from different contracts are processed in parallel —
+ * so a ledger carrying thousands of events no longer stalls the stream.
  */
 export function startHorizonStreamingIndexer(options: StreamingIndexerOptions): {
   stop: () => void;
+  getMetrics: () => IngestionPoolMetrics;
 } {
-  const { networkConfig, contractIds, onEvent, onError } = options;
+  const { networkConfig, contractIds, onEvent, onError, workerCount, maxQueueSize } = options;
   const server = new Horizon.Server(networkConfig.horizonUrl);
 
   let isRunning = true;
   let closeStream: (() => void) | null = null;
 
+  // The consumer fleet: each worker decodes a queued event and runs onEvent.
+  const pool = createIngestionPool<StreamEventEnvelope>({
+    workerCount: workerCount ?? DEFAULT_WORKER_COUNT,
+    maxQueueSize,
+    // Partition by contract ID to keep per-contract ordering strictly FIFO.
+    partitionKey: (envelope) => envelope.contractId,
+    process: async (envelope) => {
+      await onEvent(envelopeToRawEvent(envelope));
+    },
+    onError: (err) => {
+      console.error("[streaming-indexer] Error processing event:", err);
+      if (onError) onError(err);
+    },
+  });
+
   async function startStream() {
     if (!isRunning) return;
 
-    console.log("[streaming-indexer] Starting Horizon transaction stream...");
+    console.log(
+      `[streaming-indexer] Starting Horizon transaction stream (${workerCount ?? DEFAULT_WORKER_COUNT} consumers)...`
+    );
 
     try {
       closeStream = server
         .transactions()
         .cursor("now")
         .stream({
+          // Producer: parse the envelope, route events, return fast.
           onmessage: async (tx: any) => {
             if (!tx.result_meta_xdr) return;
 
@@ -387,7 +463,8 @@ export function startHorizonStreamingIndexer(options: StreamingIndexerOptions): 
                 events = meta.v4().sorobanMeta().events();
               }
 
-              for (const event of events) {
+              for (let eventIndex = 0; eventIndex < events.length; eventIndex++) {
+                const event = events[eventIndex];
                 const contractId = event.contractId()
                   ? StrKey.encodeContract(event.contractId())
                   : "unknown";
@@ -397,22 +474,15 @@ export function startHorizonStreamingIndexer(options: StreamingIndexerOptions): 
                   continue;
                 }
 
-                // Convert to RawEvent format
-                const rawEvent: RawEvent = {
-                  id: `${tx.id}-${events.indexOf(event)}`,
+                // Hand off to the consumer fleet (backpressure-aware).
+                await pool.enqueue({
+                  event,
                   contractId,
-                  topics: event
-                    .body()
-                    .v0()
-                    .topics()
-                    .map((topic) => `0x${topic.toXDR("hex")}`),
-                  data: `0x${event.body().v0().data().toXDR("hex")}`,
-                  ledger: tx.ledger_attr,
-                  timestamp: Math.floor(Date.now() / 1000), // Horizon tx doesn't have easy timestamp in stream?
+                  txId: tx.id,
                   txHash: tx.hash,
-                };
-
-                await onEvent(rawEvent);
+                  ledger: tx.ledger_attr,
+                  eventIndex,
+                });
               }
             } catch (err) {
               console.error("[streaming-indexer] Error decoding transaction meta:", err);
@@ -445,7 +515,10 @@ export function startHorizonStreamingIndexer(options: StreamingIndexerOptions): 
       if (closeStream) {
         closeStream();
       }
+      // Drain in-flight events, then stop the consumer fleet.
+      void pool.stop();
       console.log("[streaming-indexer] Stopped");
     },
+    getMetrics: () => pool.metrics(),
   };
 }
