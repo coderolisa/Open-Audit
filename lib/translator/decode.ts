@@ -420,3 +420,26 @@ export function decodeScVal(hex: string): DecodedScVal | DecodedMap | DecodedVec
       };
   }
 }
+
+/**
+ * Interpolates a template string by replacing `{key}` placeholders with
+ * values from the provided params object.
+ *
+ * Unknown keys are left as-is (e.g. "{unknown}" stays "{unknown}").
+ *
+ * @example
+ * interpolateTemplate("User {from} sent {amount} tokens to {to}.", {
+ *   from: "GABC...1234",
+ *   amount: "100.00",
+ *   to: "GXYZ...5678",
+ * });
+ * // → "User GABC...1234 sent 100.00 tokens to GXYZ...5678."
+ */
+export function interpolateTemplate(
+  template: string,
+  params: Record<string, string>
+): string {
+  return template.replace(/\{(\w+)\}/g, (match, key) =>
+    Object.prototype.hasOwnProperty.call(params, key) ? params[key] : match
+  );
+}
