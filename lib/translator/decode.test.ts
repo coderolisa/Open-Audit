@@ -1,19 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { translateEvent } from "./registry";
-import {
-  interpolateTemplate,
-  isValidHex,
-  sanitizeHex,
-  escapeHtml,
-  detectScValType,
-  decodeMap,
-  decodeVec,
-  decodeEnum,
-  decodeScVal,
-  sanitizeTextField,
-  validateTextField
-} from "./decode";
+import { translateEvent, matchesEventCriteria } from "./registry";
+import * as Core from "./core";
 import type { RawEvent } from "./types";
+
+const { interpolateTemplate, isValidHex, sanitizeHex, escapeHtml, detectScValType, decodeMap, decodeVec, decodeEnum, decodeScVal } = Core;
 
 /**
  * Mock XDR data for testing Soroban event translation.
