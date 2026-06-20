@@ -5,12 +5,16 @@
  * translation blueprints. When a raw event arrives, the registry:
  *
  *   1. Looks up the contract ID in the blueprint map.
- *   2. Calls the blueprint's translate() function.
- *   3. Returns a TranslatedEvent with a human-readable description,
+ *   2. Selects the most recent versioned schema whose validFromLedger ≤ event.ledger.
+ *   3. Calls the blueprint's translate() function.
+ *   4. Returns a TranslatedEvent with a human-readable description,
  *      or marks the event as "cryptic" if no blueprint matches.
  *
  * To add support for a new contract, create a blueprint in ./blueprints/
  * and register it in buildRegistry() below.
+ *
+ * To support a contract upgrade, register an additional VersionedTranslationBlueprint
+ * with a `validFromLedger` set to the first ledger of the upgraded contract.
  */
 
 import { createAllSacBlueprints } from "./blueprints/sac-transfer";
@@ -253,10 +257,11 @@ export function translateEvent(
   if (!schema) {
     return {
       raw: event,
-      description: null,
+      description: `[Unknown Event: No blueprint registered for contract ${event.contractId}. Hex Data: ${event.data}]`,
       status: "cryptic",
       blueprintName: null,
       eventType: null,
+      schemaVersion: null,
     };
   }
 
@@ -288,6 +293,7 @@ function applyBlueprint(event: RawEvent, blueprint: TranslationBlueprint, lang: 
     status: "translated",
     blueprintName: blueprint.contractName,
     eventType: result.eventType,
+    schemaVersion: blueprint.version ?? null,
   };
 }
 
@@ -344,13 +350,27 @@ export function translateEvents(
   return events.map(function (event: RawEvent): TranslatedEvent {
     try {
       return translateEvent(event, customBlueprints, lang);
-    } catch {
+    } catch (error) {
+      const templateError = new RegistryTemplateException(
+        error instanceof Error ? error.message : "Translation failed",
+        {
+          contractId: event.contractId,
+          ledgerSequence: event.ledger,
+          xdrHex: event.data,
+          txHash: event.txHash,
+          operation: "translateEvent",
+        },
+        error
+      );
+      captureExceptionSync(templateError);
+
       return {
         raw: event,
         description: null,
         status: "cryptic",
         blueprintName: null,
         eventType: null,
+        schemaVersion: null,
       };
     }
   });
@@ -375,4 +395,21 @@ export function getRegisteredContracts(): string[] {
  */
 export function getBlueprintCount(): number {
   return REGISTRY.size;
+}
+
+/**
+ * Registers one or more versioned blueprints for a contract at runtime.
+ *
+ * Call this to add or upgrade a contract's translation schemas without
+ * rebuilding the singleton. The blueprint list is re-sorted after insertion.
+ */
+export function registerBlueprint(...blueprints: VersionedTranslationBlueprint[]): void {
+  for (const blueprint of blueprints) {
+    const existing = REGISTRY.get(blueprint.contractId) ?? [];
+    existing.push(blueprint);
+    REGISTRY.set(
+      blueprint.contractId,
+      existing.sort((a, b) => (b.validFromLedger ?? 0) - (a.validFromLedger ?? 0))
+    );
+  }
 }
