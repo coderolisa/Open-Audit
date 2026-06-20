@@ -64,6 +64,12 @@ export async function shutdownTelemetry(): Promise<void> {
   console.log("[telemetry] OpenTelemetry shutdown complete");
 }
 
+export function captureExceptionSync(error: Error, options?: { context?: Record<string, unknown> }): void {
+  const contextInfo = options?.context ? ` | context=${JSON.stringify(options.context)}` : "";
+  diag.error(`Captured exception: ${error.message}${contextInfo}`);
+  console.error("[telemetry] Captured exception:", error, options?.context ?? "");
+}
+
 export async function metricsHandler(res: import("http").ServerResponse): Promise<void> {
   try {
     const metrics = await metricsRegistry.metrics();

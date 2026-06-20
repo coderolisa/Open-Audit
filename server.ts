@@ -13,7 +13,7 @@ import { MOCK_RAW_EVENTS } from "./lib/mock-data";
 import { translateEvent } from "./lib/translator/registry";
 import { startHorizonStreamingIndexer } from "./lib/stellar/indexer";
 import { getNetworkConfig } from "./lib/stellar/client";
-import { eventsIngestedTotal, metricsHandler, recordTranslationDuration, startTelemetry } from "./lib/telemetry";
+import { captureExceptionSync, eventsIngestedTotal, metricsHandler, recordTranslationDuration, startTelemetry } from "./lib/telemetry";
 
 const dev = process.env.NODE_ENV !== "production";
 const port = parseInt(process.env.PORT ?? "3000", 10);
@@ -61,6 +61,7 @@ app.prepare().then(async () => {
       broadcast(translated);
     },
     onError: (err) => {
+      captureExceptionSync(err, { context: { operation: "horizonStreamingIndexer" } });
       console.error("[Indexer] Streaming error:", err);
     },
   });
