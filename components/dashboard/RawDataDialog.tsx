@@ -1,7 +1,7 @@
 "use client";
 
 import { Code, ExternalLink, Copy, Check } from "lucide-react";
-import { useState } from "react";
+import React, { useState } from "react";
 import {
   Dialog,
   DialogContent,

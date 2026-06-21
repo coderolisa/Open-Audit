@@ -1,7 +1,12 @@
+import React from "react";
 import { render } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
 import { axe } from "vitest-axe";
 import { EventFeedTable } from "./EventFeedTable";
+
+vi.mock("react-syntax-highlighter", () => ({
+  Prism: () => <div data-testid="mock-syntax-highlighter" />
+}));
 
 describe("EventFeedTable Accessibility", () => {
   it("should have no accessibility violations", async () => {

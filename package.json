@@ -17,7 +17,6 @@
     "db:studio": "prisma studio"
   },
   "dependencies": {
-    "prisma": "^5.8.0",
     "@radix-ui/react-dialog": "^1.0.5",
     "@radix-ui/react-slot": "^1.0.2",
     "@radix-ui/react-toast": "^1.2.17",
@@ -31,6 +30,7 @@
     "next": "14.2.3",
     "node-cron": "^3.0.3",
     "pino": "^8.17.2",
+    "prisma": "^5.8.0",
     "react": "^18",
     "react-dom": "^18",
     "react-syntax-highlighter": "^16.1.1",
@@ -42,7 +42,9 @@
     "ws": "^8.18.0"
   },
   "devDependencies": {
-    "@types/bull": "^4.10.8",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@types/bull": "^4.10.4",
     "@types/ioredis": "^4.28.10",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^20",
@@ -55,13 +57,16 @@
     "autoprefixer": "^10.0.1",
     "eslint": "^8",
     "eslint-config-next": "14.2.3",
+    "happy-dom": "^20.10.6",
     "ioredis": "^5.11.1",
+    "jsdom": "^27.0.1",
     "msw": "^2.14.6",
     "postcss": "^8",
     "prettier": "^3.2.5",
     "tailwindcss": "^3.3.0",
     "ts-node": "^10.9.2",
     "typescript": "^5",
-    "vitest": "^2.1.8"
+    "vitest": "^2.1.8",
+    "vitest-axe": "^0.1.0"
   }
 }

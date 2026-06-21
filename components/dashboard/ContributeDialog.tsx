@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import { GitBranch, Star, ExternalLink, Code2 } from "lucide-react";
 import {
   Dialog,
