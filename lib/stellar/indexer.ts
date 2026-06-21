@@ -24,6 +24,7 @@ import { createIngestionPool, DEFAULT_WORKER_COUNT, type IngestionPoolMetrics } 
 
 import type { StellarNetworkConfig } from "./client";
 import type { RawEvent } from "../translator/types";
+import { traceRpcRequest } from "../telemetry";
 
 /** Configuration for the indexer retry mechanism. */
 export interface IndexerRetryConfig {
@@ -269,15 +270,17 @@ export async function fetchEventsWithRetry(
   for (let attempt = 0; attempt <= retryConfig.maxRetries; attempt++) {
     try {
       // Attempt to fetch events
-      const response = await server.getEvents({
-        startLedger,
-        filters: [
-          {
-            type: "contract",
-            contractIds,
-          },
-        ],
-      });
+      const response = await traceRpcRequest(contractIds.join(","), () =>
+        server.getEvents({
+          startLedger,
+          filters: [
+            {
+              type: "contract",
+              contractIds,
+            },
+          ],
+        })
+      );
 
       if (isRedisEnabled() && sorobanRpcUrl) {
         try {

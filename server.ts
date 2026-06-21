@@ -13,7 +13,7 @@ import { MOCK_RAW_EVENTS } from "./lib/mock-data";
 import { translateEvent } from "./lib/translator/registry";
 import { createFileIngestionStateStore, startHorizonStreamingIndexer } from "./lib/stellar/indexer";
 import { getNetworkConfig } from "./lib/stellar/client";
-import { captureExceptionSync } from "./lib/telemetry";
+import { captureExceptionSync, eventsIngestedTotal, metricsHandler, recordTranslationDuration, startTelemetry } from "./lib/telemetry";
 
 const dev = process.env.NODE_ENV !== "production";
 const port = parseInt(process.env.PORT ?? "3000", 10);
@@ -32,7 +32,8 @@ function getClientIp(req: IncomingMessage): string {
 const app = next({ dev });
 const handle = app.getRequestHandler();
 
-app.prepare().then(() => {
+app.prepare().then(async () => {
+  await startTelemetry();
   const httpServer = createServer((req, res) => {
     res.setHeader(
       "Content-Security-Policy",
@@ -89,11 +90,13 @@ app.prepare().then(() => {
     coldStartLookbackLedgers: Number(process.env.INGESTION_COLD_START_LOOKBACK_LEDGERS ?? "100"),
     onEvent: (rawEvent) => {
       console.log(`[Indexer] New event: ${rawEvent.id} from contract ${rawEvent.contractId}`);
-      const translated = translateEvent(rawEvent);
+      const translated = recordTranslationDuration(rawEvent.contractId, () => translateEvent(rawEvent));
+      eventsIngestedTotal.labels(rawEvent.contractId, translated.status === "translated" ? "success" : "failed").inc();
       broadcast(translated);
     },
     onError: (err) => {
       captureExceptionSync(err, { context: { operation: "horizonStreamingIndexer" } });
+      console.error("[Indexer] Streaming error:", err);
     },
   });
 
