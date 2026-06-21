@@ -20,6 +20,7 @@
 import { createAllSacBlueprints } from "./blueprints/sac-transfer";
 import { createSacMintBurnBlueprint } from "./blueprints/sac-mint-burn";
 import { decodeEventName } from "./core";
+import { sanitizeTextField } from "./core";
 import { RegistryTemplateException } from "../errors";
 import { captureExceptionSync } from "../telemetry";
 import type {
@@ -183,8 +184,8 @@ function applyBlueprint(event: RawEvent, blueprint: TranslationBlueprint, lang: 
     description: result.description ? sanitizeTextField(result.description) : null,
     status: "translated",
     blueprintName: blueprint.contractName,
-    eventType: result.eventType,
-    schemaVersion: blueprint.version ?? null,
+    eventType: result.eventType ? sanitizeTextField(result.eventType, { maxLength: 64 }) : null,
+    schemaVersion: (blueprint as any).version ?? null,
   };
 }
 
