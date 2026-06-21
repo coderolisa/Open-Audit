@@ -126,18 +126,33 @@ export function translateEvent(
   }
 
   // 2. Fall back to the global community registry.
-  const blueprint = REGISTRY.get(event.contractId);
+  const entry = REGISTRY.get(event.contractId);
 
-  if (!blueprint) {
+  if (!entry) {
     console.warn(`No translation blueprint found for contract ${event.contractId}`);
     return {
       raw: event,
       description: `[Unknown Event: No blueprint registered for contract ${event.contractId}. Hex Data: ${event.data}]`,
       status: "cryptic",
       // Surface the custom contract name (if any) so the UI still has context.
-      blueprintName: custom?.contractName ?? null,
+      blueprintName: custom?.contractName ? sanitizeTextField(custom.contractName, { maxLength: 100 }) : null,
       eventType: null,
       schemaVersion: null,
+    };
+  }
+
+  const blueprint = Array.isArray(entry)
+    ? resolveBlueprint(entry, event.ledger)
+    : entry;
+
+  if (!blueprint) {
+    console.warn(`No translation blueprint applicable for contract ${event.contractId} at ledger ${event.ledger}`);
+    return {
+      raw: event,
+      description: `[Unknown Event: No blueprint applicable for contract ${event.contractId} at ledger ${event.ledger}. Hex Data: ${event.data}]`,
+      status: "cryptic",
+      blueprintName: Array.isArray(entry) ? entry[0].contractName : entry.contractName,
+      eventType: null,
     };
   }
 
@@ -148,7 +163,7 @@ export function translateEvent(
     raw: event,
     description: null,
     status: "cryptic",
-    blueprintName: blueprint.contractName,
+    blueprintName: blueprint.contractName ? sanitizeTextField(blueprint.contractName, { maxLength: 100 }) : null,
     eventType: null,
   };
 }
@@ -165,7 +180,7 @@ function applyBlueprint(event: RawEvent, blueprint: TranslationBlueprint, lang: 
 
   return {
     raw: event,
-    description: result.description,
+    description: result.description ? sanitizeTextField(result.description) : null,
     status: "translated",
     blueprintName: blueprint.contractName,
     eventType: result.eventType,
