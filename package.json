@@ -10,6 +10,7 @@
     "lint": "next lint",
     "lint:registry": "tsx scripts/lint-registry.ts",
     "validate:registry": "node scripts/validate-registry.js",
+    "validate:blueprints": "tsx scripts/validate-blueprints.ts",
     "format": "prettier --write .",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -54,7 +55,8 @@
     "tailwind-merge": "^2.3.0",
     "tailwindcss-animate": "^1.0.7",
     "three": "^0.179.0",
-    "ws": "^8.18.0"
+    "ws": "^8.18.0",
+    "zod": "^3.23.8"
   },
   "devDependencies": {
     "@types/bull": "^4.10.4",
