@@ -58,6 +58,7 @@ export function useLiveFeed(onEvent: (event: TranslatedEvent) => void): LiveFeed
   const pauseBufferRef = useRef<TranslatedEvent[]>([]);
   const isPausedRef = useRef(false);
   const onEventRef = useRef(onEvent);
+  const timeoutIdsRef = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
   onEventRef.current = onEvent;
 
   // Tracks the current reconnection attempt count. Reset to 0 on a successful
@@ -136,7 +137,9 @@ export function useLiveFeed(onEvent: (event: TranslatedEvent) => void): LiveFeed
           next.delete(event.raw.id);
           return next;
         });
+        timeoutIdsRef.current.delete(timeoutId);
       }, 600);
+      timeoutIdsRef.current.add(timeoutId);
     };
 
     ws.onclose = () => {
@@ -197,13 +200,15 @@ export function useLiveFeed(onEvent: (event: TranslatedEvent) => void): LiveFeed
         for (const event of buffered) {
           onEventRef.current(event);
           setNewEventIds((ids) => new Set(ids).add(event.raw.id));
-          setTimeout(() => {
+          const timeoutId = setTimeout(() => {
             setNewEventIds((ids) => {
               const next = new Set(ids);
               next.delete(event.raw.id);
               return next;
             });
+            timeoutIdsRef.current.delete(timeoutId);
           }, 600);
+          timeoutIdsRef.current.add(timeoutId);
         }
       }
 
