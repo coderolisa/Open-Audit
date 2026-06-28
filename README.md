@@ -51,10 +51,10 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-For the custom server with WebSocket support and `/metrics`, run:
+For the custom server with WebSocket support and `/metrics`, run the recommended decoupled web server:
 
 ```bash
-npm run dev:ws
+npm run dev:decoupled
 ```
 
 ### Environment Variables
@@ -84,9 +84,9 @@ cp .env.microservices.example .env.local
 **Development:**
 ```bash
 npm run dev              # Standard Next.js dev server
-npm run dev:ws           # Legacy monolithic server with WebSocket
-npm run dev:decoupled    # Microservices web server (requires Redis)
+npm run dev:decoupled    # Microservices web server (recommended; requires Redis)
 npm run worker:indexer   # Microservices indexer worker (requires Redis)
+npm run dev:legacy       # Legacy monolithic server (deprecated; use only for compatibility)
 npm run test:websocket   # Test WebSocket connection
 ```
 
@@ -115,7 +115,7 @@ npm run format           # Format code with Prettier
 
 ## Telemetry
 
-The custom server exposes Prometheus metrics on `http://localhost:3000/metrics` when running `npm run dev:ws`.
+The custom server exposes Prometheus metrics on `http://localhost:3000/metrics` when running `npm run dev:decoupled`.
 
 You can configure OpenTelemetry to export spans to Jaeger by setting:
 
@@ -217,8 +217,23 @@ Stellar Network → Event Indexer → Translation Engine → WebSocket Server �
 ⚠️ **Known limitations:** Under heavy load, indexing can starve the HTTP/WebSocket server of CPU cycles. See deprecation notice in `server.ts`.
 
 ```bash
-npm run dev:ws
+npm run dev:legacy
 ```
+
+Migration note for local scripts/configs:
+
+- If you have local tooling, CI scripts, or process managers that call `server.ts` directly or run `npm run dev:ws`, update them to the new explicit legacy script:
+
+```bash
+# To keep running the legacy monolithic server (not recommended):
+npm run dev:legacy
+
+# Recommended: use the decoupled microservices server and indexer:
+npm run dev:decoupled
+npm run worker:indexer
+```
+
+This change ensures `npm run dev` and the documented development path do not silently start the deprecated server.
 
 ---
 
